@@ -237,6 +237,18 @@
       margin-bottom: 30px;
     }
 
+    .logsHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .logsHeader h2 {
+      margin: 0;
+    }
+
     canvas {
       width: 100% !important;
       height: 320px !important;
@@ -326,7 +338,10 @@
     <!-- LOGS TAB -->
     <div id="tab_logs" style="display:none;">
 
-      <h2>📜 Spin Logs</h2>
+      <div class="logsHeader">
+        <h2>📜 Spin Logs</h2>
+        <button class="btn" onclick="exportCSV()">Export CSV</button>
+      </div>
 
       <table id="logTable">
         <thead>
@@ -349,8 +364,6 @@
         <button class="btn" onclick="nextPage()">Next</button>
       </div>
 
-      <button class="btn" onclick="exportCSV()">Export CSV</button>
-
     </div>
 
     <!-- ANALYTICS TAB -->
@@ -365,6 +378,7 @@
         <div class="analyticBox">Win Rate: <span id="a_winRate">0%</span></div>
         <div class="analyticBox">Max Win: <span id="a_maxWin">0</span></div>
         <div class="analyticBox">Jackpot Hits: <span id="a_jpHits">0</span></div>
+        <div class="analyticBox">Admin Profit: <span id="a_adminProfit">0</span></div>
       </div>
 
       <div class="chartBox">
@@ -398,8 +412,8 @@
       rake: 20,
       jpPercent: 2,
       jpThreshold: 2000,
-      targetRtp: 70,
-      softener: 8
+      targetRtp: 80,
+      softener: 5
     };
 
     const DPR = window.devicePixelRatio || 1;
@@ -798,6 +812,7 @@
       let winRate = (logData.filter(r => r.win > 0).length / Math.max(1, spins)) * 100;
       let maxWin = Math.max(0, ...logData.map(r => r.win));
       let jpHits = logData.filter(r => r.jp === "YES").length;
+      let adminProfit = totalSpins * ENTRY_FEE * (ADMIN_RAKE / 100);
 
       document.getElementById("a_totalSpins").innerText = spins;
       document.getElementById("a_totalWins").innerText = wins;
@@ -805,6 +820,7 @@
       document.getElementById("a_winRate").innerText = winRate.toFixed(2) + "%";
       document.getElementById("a_maxWin").innerText = maxWin;
       document.getElementById("a_jpHits").innerText = jpHits;
+      document.getElementById("a_adminProfit").innerText = adminProfit.toFixed(2);
 
       updateCharts();
     }
