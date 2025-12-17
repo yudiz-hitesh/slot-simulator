@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Slot RTP Simulator — Advanced Analytics</title>
+
+  <style>
+    /* ------------------ GLOBAL ------------------ */
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0a0e12;
+      color: #e8faff;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ------------------ HEADER BAR ------------------ */
+    .header {
+      width: 100%;
+      height: 60px;
+      background: #0d141a;
+      border-bottom: 2px solid #00eaff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #00eaff;
+      letter-spacing: 1px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 50;
+    }
+
+    /* ------------------ SIDEBAR ------------------ */
+    .sidebar {
+      position: fixed;
+      top: 60px;
+      /* below header */
+      left: 0;
+      width: 220px;
+      height: calc(100vh - 60px);
+      background: #0f161c;
+      border-right: 2px solid #00eaff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .menu-item {
+      padding: 16px 22px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #c7f5ff;
+    }
+
+    .menu-item:hover,
+    .active {
+      background: #00eaff33;
+      color: #00eaff;
+    }
+
+    /* ------------------ MAIN AREA ------------------ */
+    .main {
+      margin-left: 220px;
+      margin-top: 60px;
+      padding: 25px;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+
+    /* ------------------ STATS ------------------ */
+    .statsRow {
+      display: flex;
+      gap: 20px;
+    }
+
+    .statBox {
+      flex: 1;
+      background: #111b22;
+      padding: 20px;
+      border: 2px solid #00eaff;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .statBox span {
+      display: block;
+      margin-top: 8px;
+      font-size: 26px;
+      font-weight: bold;
+      color: #00eaff;
+    }
+
+    /* ------------------ REELS ------------------ */
+    .reelArea {
+      margin-top: 40px;
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+    }
+
+    .reel {
+      width: 150px;
+      height: 180px;
+      background: black;
+      border: 2px solid #00eaff;
+      border-radius: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    .reel-text {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0px;
+      text-transform: uppercase;
+      text-align: center;
+      white-space: nowrap;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: clip;
+      padding: 0 8px;
+      box-sizing: border-box;
+      display: block;
+    }
+
+    .reel-win {
+      color: #00eaff;
+      text-shadow: 0 0 8px #00eaff, 0 0 15px #00eaff;
+    }
+
+    .reel-loss {
+      color: #ffffff;
+    }
+
+    .reel-jp {
+      color: gold;
+      text-shadow: 0 0 10px gold, 0 0 20px gold, 0 0 30px #ffdf00;
+    }
+
+    /* ------------------ BUTTONS ------------------ */
+    .btnRow {
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    .btn {
+      background: #00eaff;
+      border: none;
+      padding: 10px 25px;
+      border-radius: 6px;
+      font-size: 17px;
+      margin: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #001116;
+    }
+
+    .btn:hover {
+      opacity: .85;
+    }
+
+    /* ------------------ LOADER ------------------ */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000000dd;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      font-size: 36px;
+      color: #00eaff;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+    }
+
+    /* ------------------ LOGS TABLE ------------------ */
+    #logTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th {
+      background: #00eaff33;
+      font-size: 16px;
+      padding: 10px;
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #203038;
+      text-align: center;
+    }
+
+    .pagination {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    /* ------------------ ANALYTICS ------------------ */
+    .analyticsGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .analyticBox {
+      background: #111b22;
+      padding: 20px;
+      border: 2px solid #00eaff;
+      border-radius: 12px;
+    }
+
+    .chartBox {
+      background: #0f161c;
+      border: 2px solid #00eaff;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 30px;
+      margin-bottom: 30px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 320px !important;
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER BAR -->
+  <div class="header">
+    🎰 Slot RTP Simulator — Advanced Analytics Edition
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div>
+      <div class="menu-item active" onclick="switchTab('slot')">🎰 Slot</div>
+      <div class="menu-item" onclick="switchTab('analytics')">📊 Analytics</div>
+      <div class="menu-item" onclick="switchTab('logs')">📜 Logs</div>
+    </div>
+    <div>
+      <div class="menu-item" onclick="switchTab('config')">⚙️ Config</div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main">
+
+    <!-- SLOT TAB -->
+    <div id="tab_slot">
+
+      <h1>🎰 Slot Machine</h1>
+
+      <div class="statsRow">
+        <div class="statBox">RTP<span id="stat_rtp">0%</span></div>
+        <div class="statBox">Total Spins<span id="stat_spins">0</span></div>
+        <div class="statBox">Last Win<span id="stat_lastwin">0</span></div>
+        <div class="statBox">Jackpot<span id="stat_jp">0</span></div>
+      </div>
+
+      <div class="reelArea">
+        <div class="reel">
+          <div id="reel1" class="reel-text">---</div>
+        </div>
+        <div class="reel">
+          <div id="reel2" class="reel-text">---</div>
+        </div>
+        <div class="reel">
+          <div id="reel3" class="reel-text">---</div>
+        </div>
+      </div>
+
+      <div class="btnRow">
+        <button class="btn" onclick="spinAnimated()">SPIN</button>
+        <br />
+        <button class="btn" onclick="bulk(100)">100</button>
+        <button class="btn" onclick="bulk(500)">500</button>
+        <button class="btn" onclick="bulk(1000)">1K</button>
+        <button class="btn" onclick="bulk(5000)">5K</button>
+        <br />
+        <button class="btn" onclick="resetSession()">Reset</button>
+      </div>
+
+    </div>
+
+    <!-- CONFIG TAB -->
+    <div id="tab_config" style="display:none;">
+      <h2>⚙️ Configuration</h2>
+
+      Entry Fee: <input id="cfg_entry" value="100"><br><br>
+      Admin Rake %: <input id="cfg_rake" value="20"><br><br>
+      Jackpot %: <input id="cfg_jp" value="2"><br><br>
+      Jackpot Threshold: <input id="cfg_jpth" value="2000"><br><br>
+      Target RTP: <input id="cfg_rtp" value="70"><br><br>
+      Loss Softener: <input id="cfg_soft" value="8"><br><br>
+
+      <div class="btnRow">
+        <button class="btn" onclick="applyConfigAndReset()">Apply & Reset</button>
+        <button class="btn" onclick="resetSession()">Reset Session</button>
+        <button class="btn" onclick="setConfigInputs()">Default Config</button>
+      </div>
+    </div>
+
+    <!-- LOGS TAB -->
+    <div id="tab_logs" style="display:none;">
+
+      <h2>📜 Spin Logs</h2>
+
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>R1</th>
+            <th>R2</th>
+            <th>R3</th>
+            <th>Win</th>
+            <th>RTP</th>
+            <th>JP</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="pagination">
+        <button class="btn" onclick="prevPage()">Prev</button>
+        <span id="pageInfo">Page 1</span>
+        <button class="btn" onclick="nextPage()">Next</button>
+      </div>
+
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="tab_analytics" style="display:none;">
+
+      <h1>📊 Analytics Dashboard</h1>
+
+      <div class="analyticsGrid">
+        <div class="analyticBox">Total Spins: <span id="a_totalSpins">0</span></div>
+        <div class="analyticBox">Total Wins: <span id="a_totalWins">0</span></div>
+        <div class="analyticBox">Avg RTP: <span id="a_avgRTP">0%</span></div>
+        <div class="analyticBox">Win Rate: <span id="a_winRate">0%</span></div>
+        <div class="analyticBox">Max Win: <span id="a_maxWin">0</span></div>
+        <div class="analyticBox">Jackpot Hits: <span id="a_jpHits">0</span></div>
+      </div>
+
+      <div class="chartBox">
+        <h3>RTP Trend</h3>
+        <canvas id="chart_rtp"></canvas>
+      </div>
+
+      <div class="chartBox">
+        <h3>Win Distribution</h3>
+        <canvas id="chart_wins"></canvas>
+      </div>
+
+      <div class="chartBox">
+        <h3>Symbol Frequency</h3>
+        <canvas id="chart_symbols"></canvas>
+      </div>
+
+    </div>
+
+  </div> <!-- END MAIN -->
+
+  <!-- LOADER -->
+  <div id="loader">Processing… 0%</div>
+  <script>
+    //<!-- PART 2 + PART 3 SCRIPTS WILL LOAD BELOW -->
+    /* -----------------------------------------------------
+    GLOBAL STATE
+    ----------------------------------------------------- */
+    const DEFAULT_CONFIG = {
+      entry: 100,
+      rake: 20,
+      jpPercent: 2,
+      jpThreshold: 2000,
+      targetRtp: 70,
+      softener: 8
+    };
+
+    const DPR = window.devicePixelRatio || 1;
+    if (window.Chart) {
+      Chart.defaults.devicePixelRatio = DPR;
+    }
+
+    let ENTRY_FEE = DEFAULT_CONFIG.entry;
+    let ADMIN_RAKE = DEFAULT_CONFIG.rake; // %
+    let JACKPOT_PERCENT = DEFAULT_CONFIG.jpPercent;
+    let JACKPOT_THRESHOLD = DEFAULT_CONFIG.jpThreshold;
+    let TARGET_RTP = DEFAULT_CONFIG.targetRtp;
+    let LOSS_SOFTENER = DEFAULT_CONFIG.softener;
+
+    let jackpotPool = 0;
+    let totalSpins = 0;
+    let totalWins = 0;
+    let totalPayout = 0;
+    let currentRTP = 0;
+    let consecutiveLosses = 0;
+
+    let logData = [];
+    let currentPage = 1;
+    const ROWS_PER_PAGE = 100;
+
+    const SYMBOLS = [
+      "CHERRY", "BANANA", "GRAPES", "BELL",
+      "SEVEN", "SINGLEBAR", "DOUBLEBAR", "TRIPLEBAR"
+    ];
+
+    /* -----------------------------------------------------
+    TAB SWITCHING
+    ----------------------------------------------------- */
+    function switchTab(tab) {
+      document.querySelectorAll(".menu-item").forEach(e => e.classList.remove("active"));
+      document.querySelectorAll(".menu-item").forEach(e => {
+        if (e.innerText.toLowerCase().includes(tab)) e.classList.add("active");
+      });
+
+      document.querySelectorAll(".main > div").forEach(div => div.style.display = "none");
+      document.getElementById("tab_" + tab).style.display = "block";
+
+      if (tab === "analytics") updateAnalytics();
+      if (tab === "logs") updateLogTable();
+    }
+
+    /* -----------------------------------------------------
+    CONFIG APPLY
+    ----------------------------------------------------- */
+    function setConfigInputs(cfg = DEFAULT_CONFIG) {
+      document.getElementById("cfg_entry").value = cfg.entry;
+      document.getElementById("cfg_rake").value = cfg.rake;
+      document.getElementById("cfg_jp").value = cfg.jpPercent;
+      document.getElementById("cfg_jpth").value = cfg.jpThreshold;
+      document.getElementById("cfg_rtp").value = cfg.targetRtp;
+      document.getElementById("cfg_soft").value = cfg.softener;
+    }
+
+    function applyConfig() {
+      ENTRY_FEE = Number(document.getElementById("cfg_entry").value);
+      ADMIN_RAKE = Number(document.getElementById("cfg_rake").value);
+      JACKPOT_PERCENT = Number(document.getElementById("cfg_jp").value);
+      JACKPOT_THRESHOLD = Number(document.getElementById("cfg_jpth").value);
+      TARGET_RTP = Number(document.getElementById("cfg_rtp").value);
+      LOSS_SOFTENER = Number(document.getElementById("cfg_soft").value);
+    }
+
+    function resetSession() {
+      jackpotPool = 0;
+      totalSpins = 0;
+      totalWins = 0;
+      totalPayout = 0;
+      currentRTP = 0;
+      consecutiveLosses = 0;
+      logData = [];
+      currentPage = 1;
+
+      setReelText("reel1", "---", "reel-loss");
+      setReelText("reel2", "---", "reel-loss");
+      setReelText("reel3", "---", "reel-loss");
+
+      const statRtp = document.getElementById("stat_rtp");
+      const statSpins = document.getElementById("stat_spins");
+      const statLastwin = document.getElementById("stat_lastwin");
+      const statJp = document.getElementById("stat_jp");
+      if (statRtp) statRtp.innerText = "0%";
+      if (statSpins) statSpins.innerText = 0;
+      if (statLastwin) statLastwin.innerText = 0;
+      if (statJp) statJp.innerText = jackpotPool.toFixed(2);
+
+      updateLogTable();
+      if (typeof updateAnalytics === "function") updateAnalytics();
+    }
+
+    function applyConfigAndReset() {
+      applyConfig();
+      resetSession();
+    }
+
+    /* -----------------------------------------------------
+    RNG + RESULT PICKER
+    ----------------------------------------------------- */
+    function pickRandomSymbol() {
+      return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    }
+
+    function evaluateSpin(r1, r2, r3) {
+      // Jackpot check
+      if (r1 === "SEVEN" && r2 === "SEVEN" && r3 === "SEVEN") {
+        return { win: jackpotPool, jackpot: true };
+      }
+
+      // Matching rules (simple for demo)
+      if (r1 === r2 && r2 === r3) {
+        let mult = {
+          "CHERRY": 10,
+          "BANANA": 12,
+          "GRAPES": 15,
+          "BELL": 20,
+          "SEVEN": 50,
+          "SINGLEBAR": 5,
+          "DOUBLEBAR": 8,
+          "TRIPLEBAR": 12
+        }[r1] || 0;
+
+        return { win: ENTRY_FEE * mult, jackpot: false };
+      }
+
+      // Softened losses
+      if (Math.random() < 1 / LOSS_SOFTENER) { return { win: ENTRY_FEE * 2, jackpot: false }; } return {
+        win: 0, jackpot:
+          false
+      };
+    } /* ----------------------------------------------------- VISUAL REELS (WIN/LOSS COLORS)
+    ----------------------------------------------------- */
+    function setReelText(id, text, cls) {
+      const reel = document.getElementById(id);
+      reel.className = "reel-text " + cls;
+      reel.textContent = text;
+
+      // Auto-adjust font size to fit text in box
+      const reelContainer = reel.parentElement;
+      if (reelContainer) {
+        // Reset font size to base
+        reel.style.fontSize = '';
+        // Force layout calculation
+        reel.offsetHeight;
+
+        const containerWidth = reelContainer.offsetWidth - 20; // Account for padding
+        const maxFontSize = 16;
+        let fontSize = maxFontSize;
+        reel.style.fontSize = fontSize + 'px';
+
+        // Reduce font size if text overflows
+        while (reel.scrollWidth > containerWidth && fontSize > 10) {
+          fontSize -= 0.5;
+          reel.style.fontSize = fontSize + 'px';
+          // Force reflow
+          reel.offsetHeight;
+        }
+      }
+    }
+    /*
+    ----------------------------------------------------- MANUAL SPIN (ANIMATED)
+    ----------------------------------------------------- */
+    async function spinAnimated() {
+      disableUI(true);
+      try {
+        let s1 = pickRandomSymbol();
+        let s2 = pickRandomSymbol();
+        let s3 = pickRandomSymbol();
+        // Fake animation
+        await animateReel("reel1", s1, 300);
+        await animateReel("reel2", s2, 500);
+        await animateReel("reel3", s3, 700);
+        processSpin([s1, s2, s3]);
+      } catch (error) {
+        console.error("Spin error:", error);
+      } finally {
+        disableUI(false);
+      }
+    }
+
+    function animateReel(id, finalSymbol, duration) {
+      return new Promise(resolve => {
+        const reel = document.getElementById(id);
+
+        let steps = 10;
+        let stepTime = duration / steps;
+        let interval = setInterval(() => {
+          let temp = pickRandomSymbol();
+          setReelText(id, temp, "reel-loss");
+          steps--;
+          if (steps <= 0) {
+            clearInterval(interval);
+            setReelText(id, finalSymbol, "reel-loss");
+            resolve();
+          }
+        }, stepTime);
+      });
+    }
+    /* ----------------------------------------------------- PROCESS A SINGLE SPIN (REAL CALC)
+      ----------------------------------------------------- */
+    function processSpin(symbols) {
+      try {
+        let [r1, r2, r3] = symbols;
+        let forcedSoftWin = false;
+
+        // jackpot pool increase
+        jackpotPool += (ENTRY_FEE * JACKPOT_PERCENT / 100);
+
+        // rake taken
+        const playerFund = ENTRY_FEE - (ENTRY_FEE * ADMIN_RAKE / 100);
+
+        let result = evaluateSpin(r1, r2, r3);
+        let win = result.win;
+
+        // Losing-streak relief: if player hits configured streak of losses, force a small win
+        if (win === 0) {
+          consecutiveLosses += 1;
+          if (consecutiveLosses >= LOSS_SOFTENER) {
+            forcedSoftWin = true;
+            consecutiveLosses = 0;
+            const reliefSymbol = "SINGLEBAR"; // small, consistent payout
+            r1 = r2 = r3 = reliefSymbol;
+            win = ENTRY_FEE * 2;
+            result = { win, jackpot: false };
+          }
+        } else {
+          consecutiveLosses = 0;
+        }
+
+        if (result.jackpot) {
+          jackpotPool = 0;
+        }
+
+        totalSpins++;
+        totalWins += win;
+        totalPayout += win;
+        currentRTP = totalPayout / (totalSpins * ENTRY_FEE) * 100;
+
+        // Set reel colors
+        let cls = win > 0 ? "reel-win" : "reel-loss";
+        if (result.jackpot) cls = "reel-jp";
+
+        setReelText("reel1", r1, cls);
+        setReelText("reel2", r2, cls);
+        setReelText("reel3", r3, cls);
+
+        // update stats top
+        const statRtp = document.getElementById("stat_rtp");
+        const statSpins = document.getElementById("stat_spins");
+        const statLastwin = document.getElementById("stat_lastwin");
+        const statJp = document.getElementById("stat_jp");
+
+        if (statRtp) statRtp.innerText = currentRTP.toFixed(2) + "%";
+        if (statSpins) statSpins.innerText = totalSpins;
+        if (statLastwin) statLastwin.innerText = win;
+        if (statJp) statJp.innerText = jackpotPool.toFixed(2);
+
+        // log
+        logData.push({
+          spin: totalSpins,
+          r1, r2, r3,
+          win,
+          rtp: currentRTP,
+          jp: result.jackpot ? "YES" : ""
+        });
+
+        updateLogTable();
+      } catch (error) {
+        console.error("ProcessSpin error:", error);
+      }
+    }
+
+    /* -----------------------------------------------------
+    BULK SPINS WITH LOADER
+    ----------------------------------------------------- */
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function bulk(n) {
+      disableUI(true);
+      showLoader(true);
+
+      try {
+        for (let i = 0; i < n; i++) {
+          let s1 = pickRandomSymbol();
+          let s2 = pickRandomSymbol();
+          let s3 = pickRandomSymbol();
+          processSpin([s1, s2, s3]);
+
+          let pct = Math.floor((i + 1) / n * 100);
+          const loader = document.getElementById("loader");
+          if (loader) {
+            loader.textContent = "Processing… " + pct + "%";
+          }
+          await sleep(1); // keeps UI alive
+        }
+        // Ensure logs table is updated after all spins
+        updateLogTable();
+      } finally {
+        showLoader(false);
+        disableUI(false);
+      }
+    }
+
+    /* -----------------------------------------------------
+    LOGS (TABLE + PAGINATION)
+    ----------------------------------------------------- */
+    function updateLogTable() {
+      const tbody = document.querySelector("#logTable tbody");
+      if (!tbody) return; // Safety check if logs tab is not visible
+
+      tbody.innerHTML = "";
+
+      let start = (currentPage - 1) * ROWS_PER_PAGE;
+      let end = start + ROWS_PER_PAGE;
+      let rows = logData.slice(start, end);
+
+      rows.forEach(row => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+        <td>${row.spin}</td>
+        <td>${row.r1}</td>
+        <td>${row.r2}</td>
+        <td>${row.r3}</td>
+        <td>${row.win}</td>
+        <td>${row.rtp.toFixed(2)}%</td>
+        <td>${row.jp}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const pageInfo = document.getElementById("pageInfo");
+      if (pageInfo) {
+        pageInfo.innerText = "Page " + currentPage + " / " + Math.max(1, Math.ceil(logData.length / ROWS_PER_PAGE));
+      }
+    }
+
+    function nextPage() {
+      if (currentPage * ROWS_PER_PAGE < logData.length) { currentPage++; updateLogTable(); }
+    } function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        updateLogTable();
+      }
+    }
+
+    /* -----------------------------------------------------
+    EXPORT CSV
+    ----------------------------------------------------- */
+    function exportCSV() {
+      let csv = "Spin,R1,R2,R3,Win,RTP,JP\n";
+      logData.forEach(r => {
+        csv += `${r.spin},${r.r1},${r.r2},${r.r3},${r.win},${r.rtp.toFixed(2)},${r.jp}\n`;
+      });
+
+      let blob = new Blob([csv], { type: "text/csv" });
+      let a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "slot_logs.csv";
+      a.click();
+    }
+
+    /* -----------------------------------------------------
+    UI CONTROL (DISABLE WHILE PROCESSING)
+    ----------------------------------------------------- */
+    function disableUI(dis) {
+      document.querySelectorAll("button").forEach(btn => {
+        btn.disabled = dis;
+        btn.style.opacity = dis ? 0.5 : 1;
+      });
+    }
+
+    function showLoader(show) {
+      document.getElementById("loader").style.display = show ? "flex" : "none";
+    }
+
+    /* -----------------------------------------------------
+    ANALYTICS ENGINE
+    ----------------------------------------------------- */
+
+    let chartRTP, chartWins, chartSymbols;
+
+    /* Initialize charts after page load */
+    window.onload = () => {
+      setConfigInputs();
+      initCharts();
+    };
+
+    /* ------------------ Update Analytics Panel ------------------ */
+    function updateAnalytics() {
+      let spins = totalSpins;
+      let wins = totalWins;
+      let avgRTP = currentRTP;
+      let winRate = (logData.filter(r => r.win > 0).length / Math.max(1, spins)) * 100;
+      let maxWin = Math.max(0, ...logData.map(r => r.win));
+      let jpHits = logData.filter(r => r.jp === "YES").length;
+
+      document.getElementById("a_totalSpins").innerText = spins;
+      document.getElementById("a_totalWins").innerText = wins;
+      document.getElementById("a_avgRTP").innerText = avgRTP.toFixed(2) + "%";
+      document.getElementById("a_winRate").innerText = winRate.toFixed(2) + "%";
+      document.getElementById("a_maxWin").innerText = maxWin;
+      document.getElementById("a_jpHits").innerText = jpHits;
+
+      updateCharts();
+    }
+
+    /* -----------------------------------------------------
+    NEON CHART.JS BASE STYLE
+    ----------------------------------------------------- */
+    function neonGrid() {
+      return {
+        color: "#00eaff55",
+        lineWidth: 1,
+        drawTicks: false
+      };
+    }
+
+    function neonTicks() {
+      return {
+        color: "#00eaff",
+        font: { size: 12 }
+      };
+    }
+
+    /* NEON LINE STYLE */
+    function neonLine(color = "#00eaff") {
+      return {
+        borderColor: color,
+        borderWidth: 3,
+        tension: 0.2,
+        pointRadius: 0,
+        cubicInterpolationMode: "monotone"
+      };
+    }
+
+    /* NEON BAR STYLE */
+    function neonBars(color = "#00eaff") {
+      return {
+        backgroundColor: color + "66",
+        borderColor: color,
+        borderWidth: 2
+      };
+    }
+
+    /* -----------------------------------------------------
+    INIT CHARTS
+    ----------------------------------------------------- */
+    function initCharts() {
+      if (window.Chart) {
+        Chart.defaults.devicePixelRatio = DPR;
+      }
+
+      /* RTP TREND */
+      chartRTP = new Chart(document.getElementById("chart_rtp"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [{
+            label: "RTP %",
+            data: [],
+            ...neonLine("#00eaff")
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: neonTicks(), grid: neonGrid() },
+            y: { ticks: neonTicks(), grid: neonGrid() }
+          },
+          plugins: {
+            legend: { labels: { color: "#00eaff" } }
+          }
+        }
+      });
+
+      /* WIN DISTRIBUTION */
+      chartWins = new Chart(document.getElementById("chart_wins"), {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Win Amount",
+            data: [],
+            ...neonBars("#ff00ff")
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: neonTicks(), grid: neonGrid() },
+            y: { ticks: neonTicks(), grid: neonGrid() }
+          },
+          plugins: {
+            legend: { labels: { color: "#ff00ff" } }
+          }
+        }
+      });
+
+      /* SYMBOL FREQUENCY */
+      chartSymbols = new Chart(document.getElementById("chart_symbols"), {
+        type: "bar",
+        data: {
+          labels: SYMBOLS,
+          datasets: [{
+            label: "Frequency",
+            data: new Array(SYMBOLS.length).fill(0),
+            ...neonBars("#00ff88")
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: neonTicks(), grid: neonGrid() },
+            y: { ticks: neonTicks(), grid: neonGrid() }
+          },
+          plugins: {
+            legend: { labels: { color: "#00ff88" } }
+          }
+        }
+      });
+
+    }
+
+    /* -----------------------------------------------------
+    UPDATE CHART VALUES
+    ----------------------------------------------------- */
+    function updateCharts() {
+
+      /* RTP TREND */
+      chartRTP.data.labels = logData.map(r => r.spin);
+      chartRTP.data.datasets[0].data = logData.map(r => r.rtp.toFixed(2));
+      chartRTP.update();
+
+      /* WIN DISTRIBUTION */
+      let wins = logData.map(r => r.win).filter(w => w > 0);
+      let freqMap = {};
+      wins.forEach(w => freqMap[w] = (freqMap[w] || 0) + 1);
+
+      chartWins.data.labels = Object.keys(freqMap);
+      chartWins.data.datasets[0].data = Object.values(freqMap);
+      chartWins.update();
+
+      /* SYMBOL FREQUENCY */
+      let counts = {};
+      SYMBOLS.forEach(s => counts[s] = 0);
+      logData.forEach(r => {
+        counts[r.r1]++; counts[r.r2]++; counts[r.r3]++;
+      });
+
+      chartSymbols.data.datasets[0].data =
+        SYMBOLS.map(s => counts[s]);
+      chartSymbols.update();
+    }
+
+    /* -----------------------------------------------------
+    END OF SCRIPT
+    ----------------------------------------------------- */
+  </script>
+
+  <!-- Load Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</body>
+
+</html>
