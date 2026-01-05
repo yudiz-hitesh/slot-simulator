@@ -318,9 +318,10 @@
     </div>
 
     <!-- CONFIG TAB -->
-    <div id="tab_config" style="display:none;">
+    <div id="tab_config" style="display:none; padding-bottom: 100px;">
       <h2>⚙️ Configuration</h2>
 
+      <h3>Game Settings</h3>
       Entry Fee: <input id="cfg_entry" value="100"><br><br>
       Admin Rake %: <input id="cfg_rake" value="20"><br><br>
       Jackpot %: <input id="cfg_jp" value="2"><br><br>
@@ -328,7 +329,19 @@
       Target RTP: <input id="cfg_rtp" value="70"><br><br>
       Loss Softener: <input id="cfg_soft" value="8"><br><br>
 
-      <div class="btnRow">
+      <h3>Paytable Configuration</h3>
+      <textarea id="cfg_paytable" rows="12" cols="80" style="width: 100%; font-family: monospace; background: #0f161c; color: #00eaff; border: 2px solid #00eaff; padding: 10px; border-radius: 6px; resize: vertical;"></textarea>
+      <br><br>
+      <button class="btn" onclick="loadPaytableFromTextarea()">Load Paytable Config</button>
+      <button class="btn" onclick="loadDefaultPaytable()">Load Default Paytable</button>
+      <br><br>
+
+      <div id="paytablePreview" style="background: #111b22; padding: 15px; border: 2px solid #00eaff; border-radius: 12px; margin-top: 20px; max-height: 400px; overflow-y: auto;">
+        <h4>Current Paytable:</h4>
+        <div id="paytableList"></div>
+      </div>
+
+      <div class="btnRow" style="margin-top: 30px; margin-bottom: 50px;">
         <button class="btn" onclick="applyConfigAndReset()">Apply & Reset</button>
         <button class="btn" onclick="resetSession()">Reset Session</button>
         <button class="btn" onclick="setConfigInputs()">Default Config</button>
@@ -336,7 +349,7 @@
     </div>
 
     <!-- LOGS TAB -->
-    <div id="tab_logs" style="display:none;">
+    <div id="tab_logs" style="display:none; padding-bottom: 100px;">
 
       <div class="logsHeader">
         <h2>📜 Spin Logs</h2>
@@ -353,12 +366,14 @@
             <th>Win</th>
             <th>RTP</th>
             <th>JP</th>
+            <th>Payline</th>
+            <th>Remarks</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
 
-      <div class="pagination">
+      <div class="pagination" style="margin-top: 30px; margin-bottom: 50px;">
         <button class="btn" onclick="prevPage()">Prev</button>
         <span id="pageInfo">Page 1</span>
         <button class="btn" onclick="nextPage()">Next</button>
@@ -441,8 +456,61 @@
 
     const SYMBOLS = [
       "CHERRY", "BANANA", "GRAPES", "BELL",
-      "SEVEN", "SINGLEBAR", "DOUBLEBAR", "TRIPLEBAR"
+      "SEVEN", "SINGLEBAR", "DOUBLEBAR", "TRIPLEBAR", "DIAMOND"
     ];
+
+    // Paytable Configuration (from Images - Exact Order)
+    // Payment = Entry Fee × Multiplier
+    let PAYTABLE_CONFIG = {
+      aPaytables: [
+        { symbols: "seven_seven_seven", multiplier: "JACKPOT" },        // 777 → JACKPOT
+        { symbols: "banana_banana_banana", multiplier: "15" },          // Banana Banana Banana → 15x
+        { symbols: "bell_bell_bell", multiplier: "12" },                 // Bell Bell Bell → 12x
+        { symbols: "diamond_diamond_diamond", multiplier: "10" },        // Diamond Diamond Diamond → 10x
+        { symbols: "cherry_cherry_cherry", multiplier: "9" },            // Cherry Cherry Cherry → 9x
+        { symbols: "grapes_grapes_grapes", multiplier: "8" },            // Grapes Grapes Grapes → 8x
+        { symbols: "triplebar_triplebar_triplebar", multiplier: "7" },  // Triple BAR → 7x
+        { symbols: "doublebar_doublebar_doublebar", multiplier: "6" },  // Double BAR → 6x
+        { symbols: "singlebar_singlebar_singlebar", multiplier: "5" },  // Single BAR → 5x
+        { symbols: "anybar_anybar_anybar", multiplier: "2" },           // Any BAR Any BAR Any BAR → 2x
+        { symbols: "cherry_cherry_any", multiplier: "2" },              // Cherry Cherry Any → 2x
+        { symbols: "banana_banana_any", multiplier: "2" },               // Banana Banana Any → 2x
+        { symbols: "grapes_grapes_any", multiplier: "2" }               // Grapes Grapes Any → 2x
+      ]
+    };
+
+    // Symbol mapping: config format -> game format
+    const SYMBOL_MAP = {
+      "seven": "SEVEN",
+      "banana": "BANANA",
+      "grapes": "GRAPES",
+      "cherry": "CHERRY",
+      "bell": "BELL",
+      "diamond": "DIAMOND",
+      "singlebar": "SINGLEBAR",
+      "doublebar": "DOUBLEBAR",
+      "triplebar": "TRIPLEBAR",
+      "any": null, // wildcard
+      "anybar": null // wildcard for any bar
+    };
+
+    // Reverse mapping for display
+    const SYMBOL_DISPLAY_MAP = {
+      "SEVEN": "7",
+      "BANANA": "BANANA",
+      "GRAPES": "GRAPES",
+      "CHERRY": "CHERRY",
+      "BELL": "BELL",
+      "DIAMOND": "DIAMOND",
+      "SINGLEBAR": "BAR",
+      "DOUBLEBAR": "BAR BAR",
+      "TRIPLEBAR": "BAR BAR BAR"
+    };
+
+    // Format symbol for display
+    function formatSymbolForDisplay(symbol) {
+      return SYMBOL_DISPLAY_MAP[symbol] || symbol;
+    }
 
     /* -----------------------------------------------------
     TAB SWITCHING
@@ -458,6 +526,14 @@
 
       if (tab === "analytics") updateAnalytics();
       if (tab === "logs") updateLogTable();
+      if (tab === "config") {
+        // Update paytable textarea with current config
+        const textarea = document.getElementById("cfg_paytable");
+        if (textarea) {
+          textarea.value = JSON.stringify(PAYTABLE_CONFIG, null, 2);
+        }
+        updatePaytablePreview();
+      }
     }
 
     /* -----------------------------------------------------
@@ -511,6 +587,64 @@
     function applyConfigAndReset() {
       applyConfig();
       resetSession();
+      updatePaytablePreview();
+    }
+
+    // Load paytable from textarea
+    function loadPaytableFromTextarea() {
+      const textarea = document.getElementById("cfg_paytable");
+      if (textarea && textarea.value.trim()) {
+        if (loadPaytableConfig(textarea.value)) {
+          alert("Paytable config loaded successfully!");
+          updatePaytablePreview();
+        } else {
+          alert("Error: Invalid paytable config format!");
+        }
+      }
+    }
+
+    // Load default paytable (matching images exactly)
+    function loadDefaultPaytable() {
+      const defaultConfig = {
+        aPaytables: [
+          { symbols: "seven_seven_seven", multiplier: "JACKPOT" },        // 777 → JACKPOT
+          { symbols: "banana_banana_banana", multiplier: "15" },          // Banana Banana Banana → 15x
+          { symbols: "bell_bell_bell", multiplier: "12" },                 // Bell Bell Bell → 12x
+          { symbols: "diamond_diamond_diamond", multiplier: "10" },      // Diamond Diamond Diamond → 10x
+          { symbols: "cherry_cherry_cherry", multiplier: "9" },           // Cherry Cherry Cherry → 9x
+          { symbols: "grapes_grapes_grapes", multiplier: "8" },          // Grapes Grapes Grapes → 8x
+          { symbols: "triplebar_triplebar_triplebar", multiplier: "7" },  // Triple BAR → 7x
+          { symbols: "doublebar_doublebar_doublebar", multiplier: "6" }, // Double BAR → 6x
+          { symbols: "singlebar_singlebar_singlebar", multiplier: "5" },  // Single BAR → 5x
+          { symbols: "anybar_anybar_anybar", multiplier: "2" },         // Any BAR Any BAR Any BAR → 2x
+          { symbols: "cherry_cherry_any", multiplier: "2" },             // Cherry Cherry Any → 2x
+          { symbols: "banana_banana_any", multiplier: "2" },              // Banana Banana Any → 2x
+          { symbols: "grapes_grapes_any", multiplier: "2" }              // Grapes Grapes Any → 2x
+        ]
+      };
+      document.getElementById("cfg_paytable").value = JSON.stringify(defaultConfig, null, 2);
+      loadPaytableConfig(defaultConfig);
+      updatePaytablePreview();
+    }
+
+    // Update paytable preview
+    function updatePaytablePreview() {
+      const previewDiv = document.getElementById("paytableList");
+      if (!previewDiv) return;
+
+      let html = "<table style='width: 100%; border-collapse: collapse;'>";
+      html += "<tr style='background: #00eaff33;'><th style='padding: 8px; text-align: left;'>Symbols</th><th style='padding: 8px; text-align: left;'>Multiplier</th></tr>";
+      
+      PAYTABLE_CONFIG.aPaytables.forEach((pt, idx) => {
+        const bgColor = idx % 2 === 0 ? "#0f161c" : "#111b22";
+        html += `<tr style='background: ${bgColor};'>`;
+        html += `<td style='padding: 8px;'>${pt.symbols.replace(/_/g, " ").toUpperCase()}</td>`;
+        html += `<td style='padding: 8px; color: #00eaff; font-weight: bold;'>${pt.multiplier}</td>`;
+        html += "</tr>";
+      });
+      
+      html += "</table>";
+      previewDiv.innerHTML = html;
     }
 
     /* -----------------------------------------------------
@@ -520,33 +654,143 @@
       return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
     }
 
+    /* -----------------------------------------------------
+    PAYLINE EVALUATION ALGORITHM
+    ----------------------------------------------------- */
+    
+    // Check if a symbol matches a pattern (handles wildcards)
+    function matchesSymbol(actualSymbol, patternSymbol) {
+      if (patternSymbol === "any") {
+        return true; // matches any symbol
+      }
+      if (patternSymbol === "anybar") {
+        return actualSymbol === "SINGLEBAR" || 
+               actualSymbol === "DOUBLEBAR" || 
+               actualSymbol === "TRIPLEBAR";
+      }
+      const mappedPattern = SYMBOL_MAP[patternSymbol.toLowerCase()];
+      return mappedPattern === actualSymbol;
+    }
+
+    // Check if a combination matches a paytable pattern
+    function matchesPattern(r1, r2, r3, pattern) {
+      const parts = pattern.split("_");
+      if (parts.length !== 3) return false;
+
+      return matchesSymbol(r1, parts[0]) && 
+             matchesSymbol(r2, parts[1]) && 
+             matchesSymbol(r3, parts[2]);
+    }
+
+    // Get all bars (for anybar matching)
+    function isBar(symbol) {
+      return symbol === "SINGLEBAR" || symbol === "DOUBLEBAR" || symbol === "TRIPLEBAR";
+    }
+
+    // Generate symbols that match a payline pattern
+    function generateSymbolsForPattern(pattern) {
+      const parts = pattern.split("_");
+      if (parts.length !== 3) {
+        // Fallback to random if pattern is invalid
+        return [pickRandomSymbol(), pickRandomSymbol(), pickRandomSymbol()];
+      }
+
+      const symbols = [];
+      for (let i = 0; i < 3; i++) {
+        const patternPart = parts[i].toLowerCase();
+        
+        if (patternPart === "any") {
+          // Pick any random symbol
+          symbols.push(pickRandomSymbol());
+        } else if (patternPart === "anybar") {
+          // Pick any bar symbol
+          const bars = ["SINGLEBAR", "DOUBLEBAR", "TRIPLEBAR"];
+          symbols.push(bars[Math.floor(Math.random() * bars.length)]);
+        } else {
+          // Map to actual symbol
+          const mappedSymbol = SYMBOL_MAP[patternPart];
+          if (mappedSymbol) {
+            symbols.push(mappedSymbol);
+          } else {
+            // Fallback to random if mapping not found
+            symbols.push(pickRandomSymbol());
+          }
+        }
+      }
+      
+      return symbols;
+    }
+
+    // Get a random payline pattern (preferably with multiplier 2x for soft loss)
+    function getRandomPaylinePattern() {
+      // Filter paylines with multiplier 2x (for soft loss)
+      const softLossPaylines = PAYTABLE_CONFIG.aPaytables.filter(
+        pt => pt.multiplier === "2" && pt.multiplier !== "JACKPOT"
+      );
+      
+      if (softLossPaylines.length > 0) {
+        // Pick random from 2x multiplier paylines
+        const randomIndex = Math.floor(Math.random() * softLossPaylines.length);
+        return softLossPaylines[randomIndex].symbols;
+      }
+      
+      // If no 2x paylines, pick any non-jackpot payline
+      const nonJackpotPaylines = PAYTABLE_CONFIG.aPaytables.filter(
+        pt => pt.multiplier !== "JACKPOT"
+      );
+      
+      if (nonJackpotPaylines.length > 0) {
+        const randomIndex = Math.floor(Math.random() * nonJackpotPaylines.length);
+        return nonJackpotPaylines[randomIndex].symbols;
+      }
+      
+      // Fallback to a simple pattern
+      return "cherry_cherry_any";
+    }
+
+    // Evaluate spin using paytable config
+    // Payment Calculation: Win = Entry Fee × Multiplier (as per images)
     function evaluateSpin(r1, r2, r3) {
-      // Jackpot check
-      if (r1 === "SEVEN" && r2 === "SEVEN" && r3 === "SEVEN") {
-        return { win: jackpotPool, jackpot: true };
+      // Sort paytables by priority (JACKPOT first, then highest multiplier)
+      const sortedPaytables = [...PAYTABLE_CONFIG.aPaytables].sort((a, b) => {
+        if (a.multiplier === "JACKPOT") return -1;
+        if (b.multiplier === "JACKPOT") return 1;
+        return parseFloat(b.multiplier) - parseFloat(a.multiplier);
+      });
+
+      // Check each paytable entry in priority order (highest multiplier first)
+      for (const paytable of sortedPaytables) {
+        if (matchesPattern(r1, r2, r3, paytable.symbols)) {
+          if (paytable.multiplier === "JACKPOT") {
+            // JACKPOT: Pay full jackpot pool amount
+            return { win: jackpotPool, jackpot: true, payline: paytable.symbols };
+          } else {
+            // Regular payline: Entry Fee × Multiplier (e.g., 100 × 15 = 1500)
+            const multiplier = parseFloat(paytable.multiplier);
+            const win = ENTRY_FEE * multiplier;
+            return { win: win, jackpot: false, payline: paytable.symbols, multiplier: multiplier };
+          }
+        }
       }
 
-      // Matching rules (simple for demo)
-      if (r1 === r2 && r2 === r3) {
-        let mult = {
-          "CHERRY": 10,
-          "BANANA": 12,
-          "GRAPES": 15,
-          "BELL": 20,
-          "SEVEN": 50,
-          "SINGLEBAR": 5,
-          "DOUBLEBAR": 8,
-          "TRIPLEBAR": 12
-        }[r1] || 0;
+      // No match found - return no win (soft loss will be handled in processSpin)
+      return { win: 0, jackpot: false, payline: null, multiplier: 0 };
+    }
 
-        return { win: ENTRY_FEE * mult, jackpot: false };
+    // Load paytable from JSON config
+    function loadPaytableConfig(configJson) {
+      try {
+        const config = typeof configJson === 'string' ? JSON.parse(configJson) : configJson;
+        if (config.aPaytables && Array.isArray(config.aPaytables)) {
+          PAYTABLE_CONFIG = config;
+          console.log("Paytable config loaded:", PAYTABLE_CONFIG);
+          return true;
+        }
+        return false;
+      } catch (e) {
+        console.error("Error loading paytable config:", e);
+        return false;
       }
-
-      // Softened losses
-      if (Math.random() < 1 / LOSS_SOFTENER) { return { win: ENTRY_FEE * 2, jackpot: false }; } return {
-        win: 0, jackpot:
-          false
-      };
     } /* ----------------------------------------------------- VISUAL REELS (WIN/LOSS COLORS)
     ----------------------------------------------------- */
     function setReelText(id, text, cls) {
@@ -632,19 +876,32 @@
         let win = result.win;
 
         // Losing-streak relief: if player hits configured streak of losses, force a small win
+        // Also handle random soft loss (1/LOSS_SOFTENER chance)
         if (win === 0) {
           consecutiveLosses += 1;
-          if (consecutiveLosses >= LOSS_SOFTENER) {
+          // Check for consecutive losses OR random soft loss
+          const shouldSoftLoss = consecutiveLosses >= LOSS_SOFTENER || 
+                                 Math.random() < 1 / LOSS_SOFTENER;
+          
+          if (shouldSoftLoss) {
             forcedSoftWin = true;
             consecutiveLosses = 0;
-            const reliefSymbol = "SINGLEBAR"; // small, consistent payout
-            r1 = r2 = r3 = reliefSymbol;
+            // Generate symbols that match a payline pattern (preferably 2x multiplier)
+            const softLossPattern = getRandomPaylinePattern();
+            const generatedSymbols = generateSymbolsForPattern(softLossPattern);
+            r1 = generatedSymbols[0];
+            r2 = generatedSymbols[1];
+            r3 = generatedSymbols[2];
             win = ENTRY_FEE * 2;
-            result = { win, jackpot: false };
+            // Use the pattern we generated for as the payline (we know symbols match it)
+            result = { win, jackpot: false, payline: softLossPattern, multiplier: 2 };
           }
         } else {
           consecutiveLosses = 0;
         }
+
+        // Capture jackpot amount before resetting
+        const jackpotAmount = result.jackpot ? jackpotPool : 0;
 
         if (result.jackpot) {
           jackpotPool = 0;
@@ -674,13 +931,27 @@
         if (statLastwin) statLastwin.innerText = win;
         if (statJp) statJp.innerText = jackpotPool.toFixed(2);
 
+        // Generate remarks
+        let remarks = "";
+        if (result.jackpot) {
+          remarks = `JACKPOT = ${jackpotAmount.toFixed(2)}`;
+        } else if (win > 0 && result.multiplier) {
+          remarks = `${result.multiplier}x × ${ENTRY_FEE} = ${win}`;
+        } else {
+          remarks = `No Win (Entry: ${ENTRY_FEE})`;
+        }
+
         // log
         logData.push({
           spin: totalSpins,
           r1, r2, r3,
           win,
           rtp: currentRTP,
-          jp: result.jackpot ? "YES" : ""
+          jp: result.jackpot ? "YES" : "",
+          payline: result.payline || "",
+          multiplier: result.multiplier || 0,
+          entryFee: ENTRY_FEE,
+          remarks: remarks
         });
 
         updateLogTable();
@@ -737,12 +1008,14 @@
         let tr = document.createElement("tr");
         tr.innerHTML = `
         <td>${row.spin}</td>
-        <td>${row.r1}</td>
-        <td>${row.r2}</td>
-        <td>${row.r3}</td>
+        <td>${formatSymbolForDisplay(row.r1)}</td>
+        <td>${formatSymbolForDisplay(row.r2)}</td>
+        <td>${formatSymbolForDisplay(row.r3)}</td>
         <td>${row.win}</td>
         <td>${row.rtp.toFixed(2)}%</td>
         <td>${row.jp}</td>
+        <td>${row.payline || "-"}</td>
+        <td>${row.remarks || "-"}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -766,9 +1039,9 @@
     EXPORT CSV
     ----------------------------------------------------- */
     function exportCSV() {
-      let csv = "Spin,R1,R2,R3,Win,RTP,JP\n";
+      let csv = "Spin,R1,R2,R3,Win,RTP,JP,Payline,Remarks\n";
       logData.forEach(r => {
-        csv += `${r.spin},${r.r1},${r.r2},${r.r3},${r.win},${r.rtp.toFixed(2)},${r.jp}\n`;
+        csv += `${r.spin},${formatSymbolForDisplay(r.r1)},${formatSymbolForDisplay(r.r2)},${formatSymbolForDisplay(r.r3)},${r.win},${r.rtp.toFixed(2)},${r.jp},${r.payline || ""},${r.remarks || ""}\n`;
       });
 
       let blob = new Blob([csv], { type: "text/csv" });
@@ -802,6 +1075,8 @@
     window.onload = () => {
       setConfigInputs();
       initCharts();
+      loadDefaultPaytable(); // Load default paytable on startup
+      updatePaytablePreview();
     };
 
     /* ------------------ Update Analytics Panel ------------------ */
